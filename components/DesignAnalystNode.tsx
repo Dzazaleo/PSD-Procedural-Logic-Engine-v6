@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Optical-Mass Semantic Recomposition".
+        GOAL: Perform "Optical-Mass Semantic Recomposition" and **EXECUTE** the changes.
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -639,6 +639,15 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
+
+        CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
+        Your design audit is useless without execution. You must translate every qualitative critique into quantitative data.
+        1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
+        2. QUANTIFY YOUR INTENT:
+           - "Reduce scale by 30%" -> becomes 'individualScale: 0.7'.
+           - "Nudge down optically" -> becomes a positive 'yOffset' value (e.g., 'yOffset: 45').
+           - "Center horizontally" -> becomes 'xOffset: 0' (relative to the target center, use negative values for left, positive for right).
+        3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' block.
 
         OPTICAL ALIGNMENT PROTOCOL (MANDATORY):
         1. VISUAL MASS VS. BOUNDS: Do not rely on geometric centers. Identify the "Visual Center of Gravity" (the densest/most significant part of the artwork). Center associated text [layer-ID] relative to this mass, not the layer's box.
