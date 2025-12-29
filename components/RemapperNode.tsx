@@ -908,7 +908,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
               generationId: storePayload?.generationId,
               isSynthesizing: storePayload?.isSynthesizing,
               // PROPAGATE GATE STATE (Crucial for Store logic to act on)
-              generationAllowed: effectiveAllowed 
+              generationAllowed: effectiveAllowed,
+              method: strategy?.method || 'GEOMETRIC' // NEW: Explicit method prop for ghost sanitation
             };
         }
 
@@ -1001,13 +1002,17 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
              return;
         }
 
-        // AUTOMATED REFINEMENT RESET
+        // AUTOMATED REFINEMENT RESET (Soft-Lock Refinement Enforcement)
         const lockedPrompt = confirmations[idx];
         const isRefinementDetected = !!currentPrompt && !!lockedPrompt && currentPrompt !== lockedPrompt;
 
         if (isRefinementDetected && storePayload?.isConfirmed) {
              console.log(`[Remapper] Refinement detected for #${idx}. Revoking confirmation.`);
-             updatePayload(id, `result-out-${idx}`, { isConfirmed: false });
+             updatePayload(id, `result-out-${idx}`, { 
+                 isConfirmed: false,
+                 isTransient: true,
+                 status: 'awaiting_confirmation'
+             });
         }
 
         if (promptChanged || needsInitialPreview) {

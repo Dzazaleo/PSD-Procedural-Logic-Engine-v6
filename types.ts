@@ -171,6 +171,7 @@ export interface TransformedPayload {
   sourceReference?: string; // Carried over from Strategy for Export/Gen use
   generationId?: number; // Timestamp of the specific generation to force React updates
   generationAllowed?: boolean; // New Flag: Per-instance enforcement state
+  method?: 'GEOMETRIC' | 'GENERATIVE' | 'HYBRID'; // Added for Ghost Sanitation
 }
 
 export interface RemapperConfig {

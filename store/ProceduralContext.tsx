@@ -66,13 +66,28 @@ const reconcileTerminalState = (
         };
     }
 
-    // 1. STALE GUARD:
+    // 1. GHOST SANITATION (Method Pivot)
+    // If switching to GEOMETRIC, kill the ghost.
+    if (incomingPayload.method === 'GEOMETRIC') {
+        return {
+            ...incomingPayload,
+            previewUrl: undefined,
+            generationId: undefined,
+            isConfirmed: false,
+            isTransient: false,
+            isSynthesizing: false,
+            sourceReference: undefined,
+            requiresGeneration: false
+        };
+    }
+
+    // 2. STALE GUARD:
     // If store has a newer generation ID than incoming, reject the update.
     if (currentPayload?.generationId && incomingPayload.generationId && incomingPayload.generationId < currentPayload.generationId) {
         return currentPayload;
     }
 
-    // 2. SANITATION (Geometric Reset)
+    // 3. SANITATION (Geometric Reset)
     // Explicitly flush preview and history if status is 'idle' (e.g. disconnected or reset)
     if (incomingPayload.status === 'idle') {
         return {
@@ -84,7 +99,7 @@ const reconcileTerminalState = (
         };
     }
 
-    // 3. FLUSH PHASE (Start Synthesis)
+    // 4. FLUSH PHASE (Start Synthesis)
     if (incomingPayload.isSynthesizing) {
         return {
             ...(currentPayload || incomingPayload),
@@ -99,7 +114,7 @@ const reconcileTerminalState = (
         };
     }
 
-    // 4. REFINEMENT PERSISTENCE (State Guard)
+    // 5. REFINEMENT PERSISTENCE (State Guard)
     // Prevent accidental reset of confirmation if prompt hasn't changed structurally
     let isConfirmed = incomingPayload.isConfirmed ?? currentPayload?.isConfirmed ?? false;
     
@@ -108,7 +123,7 @@ const reconcileTerminalState = (
         isConfirmed = false;
     }
 
-    // 5. GEOMETRIC PRESERVATION
+    // 6. GEOMETRIC PRESERVATION
     // If this is a layout update (no generationId) but we have AI assets, keep them.
     if (!incomingPayload.generationId && currentPayload?.generationId) {
          return {
@@ -123,7 +138,7 @@ const reconcileTerminalState = (
          };
     }
 
-    // 6. FINAL CONSTRUCTION
+    // 7. FINAL CONSTRUCTION
     return {
         ...incomingPayload,
         isConfirmed,
@@ -160,7 +175,6 @@ export const ProceduralStoreProvider: React.FC<{ children: React.ReactNode }> = 
 
     // Check Logic Gate: Is generation permitted?
     // We check specifically if allowed is FALSE. Undefined implies allowed (default).
-    // Or we can be strict. Let's assume explicit disablement is required to trigger stripping.
     const isGenerationDisallowed = context.generationAllowed === false || context.aiStrategy?.generationAllowed === false;
 
     if (isGenerationDisallowed) {
