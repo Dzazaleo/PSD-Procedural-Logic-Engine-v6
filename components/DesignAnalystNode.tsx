@@ -638,80 +638,62 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     const layerAnalysisData = flattenLayers(sourceData.layers as SerializableLayer[]);
 
     let prompt = `
-        ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Optical-Mass Semantic Recomposition" with CENTER-RELATIVE COORDINATES.
+        ROLE: Precision Drafting Engine & Senior PSD Compositor.
+        GOAL: Perform "Geometry-First Semantic Recomposition" using a STRICT GRID SYSTEM.
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
         - Target: ${targetData.name} (${targetW}x${targetH})
-        - CURRENT GLOBAL AUTO-SCALE: ${globalScale}x (The engine defaults to this zoom level).
         
         LAYER HIERARCHY (JSON):
-        ${JSON.stringify(layerAnalysisData.slice(0, 40))}
+        ${JSON.stringify(layerAnalysisData.slice(0, 40))} ... (Truncated)
 
-        CRITICAL SCALAR NORMALIZATION (COUNTER-SCALING):
-        1. UNDERSTAND THE ZOOM: 'individualScale' multiplies the Global Auto-Scale.
-           - If Auto-Scale is ${globalScale}x, setting 'individualScale: 1.0' keeps that zoom.
-        2. COUNTERACT BLOAT: If Auto-Scale is > 1.2, text and UI elements will likely be HUGE.
-           - You MUST use 'individualScale' < 1.0 (e.g., 0.6 or 0.7) to shrink them back to a tasteful size.
-        3. HIERARCHY: Primary assets (bottles) can stay at 1.0. Secondary metadata (labels) should be 0.6 - 0.8.
-
-        CRITICAL COORDINATE SYSTEM (THE "ZERO POINT" RULE):
-        1. ORIGIN (0,0): The (0,0) point is the GEOMETRIC CENTER of the Target Container.
-        2. DIRECTIONALITY:
-           - Negative X (e.g., -200) = Move LEFT of center.
-           - Positive X (e.g., +200) = Move RIGHT of center.
-           - Negative Y (e.g., -200) = Move UP (Above center).
-           - Positive Y (e.g., +200) = Move DOWN (Below center).
-
-        CRITICAL LAYOUT MANIFEST (SEMANTIC-TO-GEOMETRIC BRIDGE):
-        You must output a structured 'layoutDirectives' array to execute your design intent.
-        1. containerId: Must match the Target Container Name provided above: '${targetData.name}'.
-        2. action: 
-           - 'SCALE': Fix hierarchy. params: { scaleFactor: 1.2 } (Grow) or 0.8 (Shrink).
-           - 'OFFSET': Fix whitespace/centering. params: { x: 50, y: -20 }.
-           - 'ANCHOR': Fix alignment. params: { anchorPoint: 'TOP_LEFT', 'CENTER', 'BOTTOM_RIGHT' }.
-        3. MAPPING RULE (DESIGN-TO-MATH): 
-           - "Too small" or "Weak Hierarchy" -> SCALE > 1.0 (e.g., 1.2x).
-           - "Too big" or "Overwhelming" -> SCALE < 1.0 (e.g., 0.8x).
-           - "Imbalanced Whitespace" -> OFFSET (Shift x/y to balance negative space).
-           - "Bad Alignment" -> ANCHOR (Re-orient origin).
-
-        CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
-        1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
-        2. QUANTIFY YOUR INTENT:
-           - "Center horizontally" -> 'xOffset: 0'.
-           - "Shrink huge text" -> 'individualScale: 0.6'.
-           - "Place at bottom" -> 'yOffset: +[HalfHeight - Padding]'.
-           - "Place at top" -> 'yOffset: -[HalfHeight - Padding]'.
-        3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' or 'layoutDirectives' block.
-
-        OPTICAL ALIGNMENT PROTOCOL (MANDATORY):
-        - Identify "Visual Center of Gravity" vs. geometric bounds.
-        - Frame primary assets (numbers) within their visual containers (bottles).
-        - Audit "Negative Space" to prevent visual collisions.
+        CRITICAL GRID LOGIC:
+        1. Analyze the Target Aspect Ratio (${(targetW/targetH).toFixed(2)}) vs Source (${(sourceW/sourceH).toFixed(2)}).
+        2. If Target is narrower/taller, STACK elements vertically.
+        3. If Target is wider, distribute horizontally.
+        4. Calculate integer 'yOffset' and 'xOffset' relative to Target Top-Left (0,0).
+        5. Maintain visual hierarchy: Key elements (Titles) must be prominent.
         
-        GROUNDING & TRUTH:
-        - Link observations to Metadata IDs [layer-ID].
-        - Cite Brand Rules where applicable.
+        LAYOUT DIRECTIVE PROTOCOL (Container-Level Logic):
+        You must issue high-level directives to fix design flaws identified in the visual audit.
+        Mapping Design Issues to Math:
+        - "To fix Whitespace/Padding issues" -> Use 'OFFSET' action (x, y).
+            Example: { action: 'OFFSET', params: { x: 0, y: 50 }, reasoning: "Add top padding to balance header" }
+        - "To fix Hierarchy/Size issues" -> Use 'SCALE' action (scaleFactor).
+             Example: { action: 'SCALE', params: { scaleFactor: 1.2 }, reasoning: "Emphasize title visibility" }
+        - "To fix Alignment" -> Use 'ANCHOR' action (TOP_LEFT, CENTER, BOTTOM_RIGHT).
+             Example: { action: 'ANCHOR', params: { anchorPoint: 'TOP_LEFT' }, reasoning: "Snap content to grid start" }
 
-        STRICT OPERATIONAL BOUNDARIES:
-        - NO CREATION ('generativePrompt': ""). NO DELETION. NO CROPPING.
-        - METHOD 'GEOMETRIC'.
+        IMPORTANT: 'containerId' in directives MUST match the Target Name provided above: "${targetData.name}".
 
-        JSON OUTPUT RULES:
-        - 'reasoning': The qualitative design audit (The "Why").
-        - 'layoutDirectives': The high-level geometric instructions for the Remapper (Container Level).
-        - 'overrides': The quantitative execution data (The "How") using CENTER-RELATIVE offsets (Layer Level).
-        - 'inventoryVerified': true.
+        DECISION MATRIX (Strict Enforcement):
+        - METHOD 'GEOMETRIC': Default. Use purely geometric transforms (scale/translate). 'generativePrompt' MUST be empty string "".
+        - METHOD 'GENERATIVE': Use ONLY if user explicitly requests (e.g., "generate", "create", "nano banana") OR if aspect ratio mismatch is > 2.0.
+          IF GENERATIVE IS SELECTED:
+          - Set 'generativePrompt' to: "Generate a high-fidelity expansion. Use the attached sourceReference for style, lighting, and texture matching. Do not deviate from the original aesthetic."
+        - METHOD 'HYBRID': Use geometric layout for main elements but generate background fill.
+        
+        PIVOT PROTOCOL (Geometric Reset):
+        If the user requests to "undo generation", "reset", "use original pixels", "stop generating", or if the strategy is GEOMETRIC:
+        1. Set 'method' to 'GEOMETRIC'.
+        2. Set 'generativePrompt' to "" (empty string).
+        3. Set 'clearance' to true.
+        4. Reset 'suggestedScale' to optimal geometric fit.
+
+        FALLBACK PROTOCOL:
+        If standard scaling fails (leaves gaps > 10% or cuts content) AND you provide a 'generativePrompt':
+        1. Set 'method' to 'HYBRID' or 'GENERATIVE'.
+        2. Prefix 'reasoning' with "[FALLBACK_REQUIRED]".
+        3. Provide the specific 'generativePrompt'.
     `;
     
     if (knowledgeContext && knowledgeContext.rules) {
-        prompt = `[GLOBAL PROJECT KNOWLEDGE - MANDATORY]\n${knowledgeContext.rules}\n\nApply the above brand rules to your critique and recomposition.\n\n` + prompt;
+        prompt = `[GLOBAL PROJECT KNOWLEDGE - MANDATORY]\n${knowledgeContext.rules}\n\nThe above rules override standard geometric defaults. Ensure 'overrides' and 'method' choices strictly adhere to these constraints.\n\n` + prompt;
     }
     
     if (isRefining) {
-        prompt += `\n\nUSER REFINEMENT: Adjust the 'overrides' and 'layoutDirectives' based on user feedback while maintaining the Expert Designer persona and non-destructive rules.`;
+        prompt += `\n\nUSER FEEDBACK RECEIVED. Adjust the 'layoutDirectives' and 'overrides' to satisfy the user request while maintaining valid JSON structure and boundary safety.`;
     }
     return prompt;
   };
