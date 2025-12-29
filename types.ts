@@ -82,6 +82,18 @@ export interface LayerOverride {
   individualScale: number;
 }
 
+export interface LayoutDirective {
+  containerId: string; // Explicitly matches target-out-{n}
+  action: 'ANCHOR' | 'SCALE' | 'OFFSET';
+  params: {
+    anchorPoint?: 'TOP_LEFT' | 'CENTER' | 'BOTTOM_RIGHT';
+    scaleFactor?: number;
+    x?: number;
+    y?: number;
+  };
+  reasoning: string;
+}
+
 export interface LayoutStrategy {
   method?: 'GEOMETRIC' | 'GENERATIVE' | 'HYBRID';
   suggestedScale: number;
@@ -89,6 +101,7 @@ export interface LayoutStrategy {
   generativePrompt: string;
   reasoning: string;
   overrides?: LayerOverride[];
+  layoutDirectives?: LayoutDirective[]; // Structured instructions for the Remapper
   safetyReport?: {
     allowedBleed: boolean;
     violationCount: number;

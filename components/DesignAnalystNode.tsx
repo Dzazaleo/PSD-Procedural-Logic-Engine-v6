@@ -52,6 +52,7 @@ const MODELS: Record<ModelKey, ModelConfig> = {
 // UPDATED: Removed 'Reasoning' text display. It is now handled by the parent container as a "Design Audit".
 const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfig }> = ({ strategy, modelConfig }) => {
     const overrideCount = strategy.overrides?.length || 0;
+    const directiveCount = strategy.layoutDirectives?.length || 0;
 
     // Determine method color badge
     let methodColor = 'text-slate-400 border-slate-600';
@@ -107,8 +108,10 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
              
              <div className="grid grid-cols-2 gap-4 mt-1">
                 <div>
-                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Global Scale</span>
-                    <span className="text-slate-200 font-mono text-sm">{strategy.suggestedScale.toFixed(3)}x</span>
+                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Directives</span>
+                    <span className={`text-sm font-mono ${directiveCount > 0 ? 'text-indigo-400 font-bold' : 'text-slate-400'}`}>
+                        {directiveCount} Actions
+                    </span>
                 </div>
                 <div>
                     <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Overrides</span>
@@ -603,7 +606,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
      }
   };
 
-  const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null) => {
+  const generateSystemInstruction = (sourceData: any, targetData: any, isRefining: boolean, knowledgeContext: KnowledgeContext | null, index: number) => {
     const sourceW = sourceData.container.bounds.w;
     const sourceH = sourceData.container.bounds.h;
     const targetW = targetData.bounds.w;
@@ -661,6 +664,18 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
            - Negative Y (e.g., -200) = Move UP (Above center).
            - Positive Y (e.g., +200) = Move DOWN (Below center).
 
+        CRITICAL LAYOUT MANIFEST (SEMANTIC-TO-GEOMETRIC BRIDGE):
+        You must output a structured 'layoutDirectives' array to execute your design intent.
+        1. containerId: Must be strictly 'target-out-${index}' (e.g. 'target-out-0' for the current analysis context).
+        2. action: 
+           - 'SCALE': Fix hierarchy. params: { scaleFactor: 1.2 } (Grow) or 0.8 (Shrink).
+           - 'OFFSET': Fix whitespace/centering. params: { x: 50, y: -20 }.
+           - 'ANCHOR': Fix alignment. params: { anchorPoint: 'TOP_LEFT' }.
+        3. MAPPING RULE: 
+           - "Too small" -> SCALE > 1.0.
+           - "Too big" -> SCALE < 1.0.
+           - "Off-center" -> OFFSET or ANCHOR.
+
         CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
         1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
         2. QUANTIFY YOUR INTENT:
@@ -685,6 +700,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         JSON OUTPUT RULES:
         - 'reasoning': The qualitative design audit (The "Why").
+        - 'layoutDirectives': The high-level geometric instructions for the Remapper.
         - 'overrides': The quantitative execution data (The "How") using CENTER-RELATIVE offsets.
         - 'inventoryVerified': true.
     `;
@@ -694,7 +710,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     }
     
     if (isRefining) {
-        prompt += `\n\nUSER REFINEMENT: Adjust the 'overrides' based on user feedback while maintaining the Expert Designer persona and non-destructive rules.`;
+        prompt += `\n\nUSER REFINEMENT: Adjust the 'overrides' and 'layoutDirectives' based on user feedback while maintaining the Expert Designer persona and non-destructive rules.`;
     }
     return prompt;
   };
@@ -720,7 +736,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         const ai = new GoogleGenAI({ apiKey });
         // Use effectiveKnowledge (null if muted)
-        const systemInstruction = generateSystemInstruction(sourceData, targetData, history.length > 1, effectiveKnowledge);
+        const systemInstruction = generateSystemInstruction(sourceData, targetData, history.length > 1, effectiveKnowledge, index);
         
         // --- Multimodal Fusion & Source Vision Injection ---
         // We construct the contents array, and augment the *last* user message to include visual context.
@@ -780,6 +796,28 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                     generativePrompt: { type: Type.STRING },
                     clearance: { type: Type.BOOLEAN, description: "Set to true when resetting from Generative back to Geometric" },
                     knowledgeApplied: { type: Type.BOOLEAN, description: "Set to true ONLY if you explicitly used the provided Knowledge/Brand Rules to influence the layout." },
+                    // NEW: Layout Directives Array
+                    layoutDirectives: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                containerId: { type: Type.STRING, description: "Must match target-out-{n}" },
+                                action: { type: Type.STRING, enum: ['ANCHOR', 'SCALE', 'OFFSET'] },
+                                params: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        anchorPoint: { type: Type.STRING, enum: ['TOP_LEFT', 'CENTER', 'BOTTOM_RIGHT'] },
+                                        scaleFactor: { type: Type.NUMBER },
+                                        x: { type: Type.NUMBER },
+                                        y: { type: Type.NUMBER }
+                                    }
+                                },
+                                reasoning: { type: Type.STRING, description: "Why this geometric action was chosen" }
+                            },
+                            required: ['containerId', 'action', 'params', 'reasoning']
+                        }
+                    },
                     overrides: {
                         type: Type.ARRAY,
                         items: {
@@ -802,7 +840,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         required: ['allowedBleed', 'violationCount']
                     }
                 },
-                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied']
+                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'layoutDirectives', 'safetyReport', 'knowledgeApplied']
             }
         };
         

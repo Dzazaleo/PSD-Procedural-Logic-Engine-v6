@@ -233,12 +233,12 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
   const activePayloads = Array.from(slotConnections.values());
   
   // Count blockers: Unconfirmed drafts and active synthesis
-  const unconfirmedDrafts = activePayloads.filter(p => {
+  const unconfirmedDrafts = activePayloads.filter((p: TransformedPayload) => {
       // If a payload is transient or waiting, it's a blocker
       return p.isTransient || p.status === 'awaiting_confirmation';
   }).length;
 
-  const activeSynthesis = activePayloads.filter(p => p.isSynthesizing).length;
+  const activeSynthesis = activePayloads.filter((p: TransformedPayload) => p.isSynthesizing).length;
 
   // PARTIAL SYNTHESIS LOGIC: Allow export if at least one slot is filled AND all active slots are confirmed/stable
   const isExportReady = isTemplateReady && filledSlots > 0 && validationErrors.length === 0 && unconfirmedDrafts === 0 && activeSynthesis === 0;
