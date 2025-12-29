@@ -1,9 +1,9 @@
 import React, { memo, useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes } from 'reactflow';
-import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy } from '../types';
+import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy, LayoutDirective } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { GoogleGenAI } from "@google/genai";
-import { Check, Sparkles, Info, Layers, Box, Cpu } from 'lucide-react';
+import { Check, Sparkles, Info, Layers, Box, Cpu, Move, ShieldAlert } from 'lucide-react';
 
 interface InstanceData {
   index: number;
@@ -25,6 +25,7 @@ interface InstanceData {
   };
   payload: TransformedPayload | null;
   strategyUsed?: boolean;
+  directivesApplied?: LayoutDirective[];
 }
 
 // --- SUB-COMPONENT: Generative Preview Overlay ---
@@ -250,19 +251,18 @@ const calculateOverrideMetrics = (
 };
 
 const OverrideInspector = ({ 
-    sourceLayers, sourceBounds, targetBounds, strategy 
+    sourceLayers, sourceBounds, targetBounds, strategy, directives 
 }: { 
     sourceLayers: SerializableLayer[], 
     sourceBounds: { x: number, y: number, w: number, h: number }, 
     targetBounds: { x: number, y: number, w: number, h: number }, 
-    strategy: LayoutStrategy 
+    strategy: LayoutStrategy,
+    directives?: LayoutDirective[]
 }) => {
     const metrics = useMemo(
         () => calculateOverrideMetrics(sourceLayers, sourceBounds, targetBounds, strategy),
         [sourceLayers, sourceBounds, targetBounds, strategy]
     );
-
-    if (metrics.length === 0) return null;
 
     return (
         <div className="bg-pink-900/10 border border-pink-500/30 rounded p-2 mt-2">
@@ -272,6 +272,26 @@ const OverrideInspector = ({
                 </span>
                 <span className="text-[9px] text-pink-400/70 font-mono">{metrics.length} Layers</span>
             </div>
+            
+            {/* Directives Section */}
+            {directives && directives.length > 0 && (
+                <div className="mb-2 space-y-1 border-b border-pink-500/10 pb-2">
+                    {directives.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between bg-pink-500/10 px-1.5 py-1 rounded">
+                            <div className="flex items-center space-x-1">
+                                <Move className="w-3 h-3 text-pink-300" />
+                                <span className="text-[9px] text-pink-200 font-mono font-bold">{d.action}</span>
+                            </div>
+                            <span className="text-[8px] text-pink-300/70">
+                                {d.action === 'SCALE' ? `${d.params.scaleFactor}x` : ''}
+                                {d.action === 'ANCHOR' ? d.params.anchorPoint : ''}
+                                {d.action === 'OFFSET' ? `x:${d.params.x} y:${d.params.y}` : ''}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                 {metrics.map(m => (
                     <div key={m.layerId} className="flex flex-col bg-slate-900/40 p-1.5 rounded border border-pink-500/10">
@@ -377,7 +397,7 @@ const RemapperInstanceRow = memo(({
     
     const isEffectiveGenerating = !!isGeneratingPreview[instance.index] || !!storeIsSynthesizing;
 
-    const hasOverrides = instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0;
+    const hasOverrides = (instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0) || (instance.directivesApplied && instance.directivesApplied.length > 0);
 
     // Process Breakdown Stats (Audit)
     const audit = useMemo(() => {
@@ -532,6 +552,7 @@ const RemapperInstanceRow = memo(({
                               sourceBounds={instance.source.originalBounds}
                               targetBounds={instance.target.bounds}
                               strategy={instance.source.aiStrategy}
+                              directives={instance.directivesApplied}
                           />
                       )}
                       
@@ -798,40 +819,116 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
         // 3. Compute Payload
         let payload: TransformedPayload | null = null;
         let strategyUsed = false;
+        let appliedDirectives: LayoutDirective[] = [];
 
         if (sourceData.ready && targetData.ready) {
             const sourceRect = sourceData.originalBounds;
             const targetRect = targetData.bounds;
             
+            // Baseline Geometry (Default: Uniform Fit Center)
             const ratioX = targetRect.w / sourceRect.w;
             const ratioY = targetRect.h / sourceRect.h;
             let scale = Math.min(ratioX, ratioY);
-            let anchorX = targetRect.x;
-            let anchorY = targetRect.y;
+            let anchorX = targetRect.x + (targetRect.w - (sourceRect.w * scale)) / 2;
+            let anchorY = targetRect.y + (targetRect.h - (sourceRect.h * scale)) / 2;
 
             const strategy = sourceData.aiStrategy;
             
+            // --- DIRECTIVE EXECUTION ENGINE ---
             if (strategy) {
-                scale = strategy.suggestedScale;
                 strategyUsed = true;
-                const scaledW = sourceRect.w * scale;
-                const scaledH = sourceRect.h * scale;
-                anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
-                if (strategy.anchor === 'TOP') anchorY = targetRect.y;
-                else if (strategy.anchor === 'BOTTOM') anchorY = targetRect.y + (targetRect.h - scaledH);
-                else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
-            } else {
-                const scaledW = sourceRect.w * scale;
-                const scaledH = sourceRect.h * scale;
-                anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
-                anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
+                
+                // A. Legacy Strategy (if directives missing)
+                if (strategy.suggestedScale && (!strategy.layoutDirectives || strategy.layoutDirectives.length === 0)) {
+                    scale = strategy.suggestedScale;
+                    const scaledW = sourceRect.w * scale;
+                    const scaledH = sourceRect.h * scale;
+                    anchorX = targetRect.x + (targetRect.w - scaledW) / 2;
+                    if (strategy.anchor === 'TOP') anchorY = targetRect.y;
+                    else if (strategy.anchor === 'BOTTOM') anchorY = targetRect.y + (targetRect.h - scaledH);
+                    else anchorY = targetRect.y + (targetRect.h - scaledH) / 2;
+                }
+
+                // B. Explicit Layout Directives (Higher Order Geometry)
+                if (strategy.layoutDirectives) {
+                    const directives: LayoutDirective[] = strategy.layoutDirectives;
+                    // Match against containerID or generic slot reference
+                    const activeDirectives = directives.filter(d => d.containerId === `target-out-${i}`);
+                    
+                    if (activeDirectives.length > 0) {
+                        appliedDirectives = activeDirectives;
+                        
+                        activeDirectives.forEach(dir => {
+                            // 1. SCALE
+                            if (dir.action === 'SCALE' && dir.params.scaleFactor) {
+                                scale *= dir.params.scaleFactor;
+                            }
+                            
+                            // 2. ANCHOR (Re-calc origin based on new scale)
+                            if (dir.action === 'ANCHOR' && dir.params.anchorPoint) {
+                                const contentW = sourceRect.w * scale;
+                                const contentH = sourceRect.h * scale;
+                                
+                                switch (dir.params.anchorPoint) {
+                                    case 'TOP_LEFT':
+                                        anchorX = targetRect.x;
+                                        anchorY = targetRect.y;
+                                        break;
+                                    case 'BOTTOM_RIGHT':
+                                        anchorX = targetRect.x + targetRect.w - contentW;
+                                        anchorY = targetRect.y + targetRect.h - contentH;
+                                        break;
+                                    case 'CENTER':
+                                        anchorX = targetRect.x + (targetRect.w - contentW) / 2;
+                                        anchorY = targetRect.y + (targetRect.h - contentH) / 2;
+                                        break;
+                                }
+                            }
+
+                            // 3. OFFSET (Additive)
+                            if (dir.action === 'OFFSET') {
+                                anchorX += dir.params.x || 0;
+                                anchorY += dir.params.y || 0;
+                            }
+                        });
+
+                        // SAFETY CLAMPING (30% Tolerance)
+                        const contentW = sourceRect.w * scale;
+                        const contentH = sourceRect.h * scale;
+                        const toleranceW = targetRect.w * 0.3;
+                        const toleranceH = targetRect.h * 0.3;
+
+                        // Center point logic for safer clamping
+                        const contentCenterX = anchorX + contentW / 2;
+                        const contentCenterY = anchorY + contentH / 2;
+                        const targetCenterX = targetRect.x + targetRect.w / 2;
+                        const targetCenterY = targetRect.y + targetRect.h / 2;
+
+                        const maxDevX = (targetRect.w / 2) + toleranceW;
+                        const maxDevY = (targetRect.h / 2) + toleranceH;
+
+                        // Clamp Logic: Ensure visual center doesn't deviate too far
+                        if (Math.abs(contentCenterX - targetCenterX) > maxDevX) {
+                            const dir = Math.sign(contentCenterX - targetCenterX);
+                            const clampedCenter = targetCenterX + (dir * maxDevX);
+                            anchorX = clampedCenter - (contentW / 2);
+                        }
+                        if (Math.abs(contentCenterY - targetCenterY) > maxDevY) {
+                            const dir = Math.sign(contentCenterY - targetCenterY);
+                            const clampedCenter = targetCenterY + (dir * maxDevY);
+                            anchorY = clampedCenter - (contentH / 2);
+                        }
+                    }
+                }
             }
 
             const transformLayers = (layers: SerializableLayer[], parentDeltaX = 0, parentDeltaY = 0): TransformedLayer[] => {
               return layers.map(layer => {
-                // 1. Calculate Standard Geometric Position (Baseline)
+                // 1. Calculate Standard Geometric Position (Baseline relative to New Anchor)
                 const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
                 const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
+                
+                // Base coordinates derived from the new execution engine values
                 const geomX = anchorX + (relX * (sourceRect.w * scale));
                 const geomY = anchorY + (relY * (sourceRect.h * scale));
                 
@@ -842,11 +939,12 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                 let finalX = geomX + parentDeltaX;
                 let finalY = geomY + parentDeltaY;
 
-                // 2. CHECK FOR OVERRIDES
+                // 2. CHECK FOR INDIVIDUAL OVERRIDES (Legacy/Fine-tuning)
+                // Applies *on top* of the Directive Engine layout
                 const override = strategy?.overrides?.find(o => o.layerId === layer.id);
                 
                 if (override) {
-                   // A. Apply Scale Multiplier FIRST
+                   // A. Apply Scale Multiplier
                    layerScaleX *= override.individualScale;
                    layerScaleY *= override.individualScale;
                    
@@ -854,23 +952,20 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                    const newW = layer.coords.w * layerScaleX;
                    const newH = layer.coords.h * layerScaleY;
 
-                   // C. Calculate Target Geometric Center
+                   // C. Calculate Target Geometric Center (Reference point for override offsets)
                    const targetCenterX = targetRect.x + (targetRect.w / 2);
                    const targetCenterY = targetRect.y + (targetRect.h / 2);
 
                    // D. Apply Center-Relative Offset (Centroid Math)
-                   // Position = (ContainerCenter) + (Offset) - (HalfLayerSize)
                    finalX = targetCenterX + override.xOffset - (newW / 2);
                    finalY = targetCenterY + override.yOffset - (newH / 2);
                 }
 
-                // 3. Boundary Safety (Bleed Check)
-                const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
-                const minY = targetRect.y - bleedY;
-                const maxY = targetRect.y + targetRect.h + bleedY;
-                
-                // Only clamp if we are NOT manually overriding (Designer might want intentional bleed)
+                // 3. Boundary Safety (Bleed Check) - skipped if overridden
                 if (!override) {
+                    const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
+                    const minY = targetRect.y - bleedY;
+                    const maxY = targetRect.y + targetRect.h + bleedY;
                     finalY = Math.max(minY, Math.min(finalY, maxY));
                 }
 
@@ -955,7 +1050,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
             source: sourceData,
             target: targetData,
             payload,
-            strategyUsed
+            strategyUsed,
+            directivesApplied: appliedDirectives
         });
     }
 
