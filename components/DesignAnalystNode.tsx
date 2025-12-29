@@ -4,7 +4,7 @@ import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystIns
 import { useProceduralStore } from '../store/ProceduralContext';
 import { getSemanticThemeObject, findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Brain, BrainCircuit, Ban } from 'lucide-react';
+import { Brain, BrainCircuit, Ban, ClipboardList } from 'lucide-react';
 import { Psd } from 'ag-psd';
 
 // Define the exact union type for model keys to match PSDNodeData
@@ -49,6 +49,7 @@ const MODELS: Record<ModelKey, ModelConfig> = {
 };
 
 // --- Subcomponent: Strategy Card Renderer ---
+// UPDATED: Removed 'Reasoning' text display. It is now handled by the parent container as a "Design Audit".
 const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfig }> = ({ strategy, modelConfig }) => {
     const overrideCount = strategy.overrides?.length || 0;
 
@@ -115,10 +116,6 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
                         {overrideCount} Layers
                     </span>
                 </div>
-             </div>
-
-             <div className="italic text-slate-300 leading-relaxed border-l-2 border-slate-600 pl-3 my-1 whitespace-pre-wrap break-words">
-                "{strategy.reasoning}"
              </div>
 
              {strategy.safetyReport && strategy.safetyReport.violationCount > 0 && (
@@ -293,15 +290,37 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                 </div>
 
                 {/* Chat Console - EXPANDED & EVENT ISOLATED */}
+                {/* UPDATED: Reasoning is now elevated as a primary "Audit" header inside the message bubble. */}
                 <div ref={chatContainerRef} className={`nodrag nopan ${compactMode ? 'h-48' : 'h-64'} overflow-y-auto border border-slate-700 bg-slate-900 rounded p-3 space-y-3 custom-scrollbar transition-all shadow-inner cursor-auto`} onMouseDown={(e) => e.stopPropagation()}>
                     {state.chatHistory.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-600 italic text-xs opacity-50"><span>Ready to analyze {targetData?.name || 'slot'}</span></div>
                     )}
                     {state.chatHistory.map((msg, idx) => (
                         <div key={msg.id || idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                            <div className={`max-w-[95%] rounded border p-2 text-xs leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-slate-800 border-slate-600 text-slate-200' : `bg-slate-800/50 ${activeModelConfig.badgeClass.replace('bg-', 'border-').split(' ')[0]} text-slate-300`}`}>
+                            <div className={`max-w-[95%] rounded border p-3 text-xs leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-slate-800 border-slate-600 text-slate-200' : `bg-slate-800/50 ${activeModelConfig.badgeClass.replace('bg-', 'border-').split(' ')[0]} text-slate-300`}`}>
                                 {msg.parts?.[0]?.text && msg.role === 'user' && (<div className="whitespace-pre-wrap break-words">{msg.parts[0].text}</div>)}
-                                {msg.strategySnapshot && (<div className="mt-1"><StrategyCard strategy={msg.strategySnapshot} modelConfig={activeModelConfig} /></div>)}
+                                
+                                {msg.role === 'model' && msg.strategySnapshot && (
+                                    <div className="flex flex-col gap-3">
+                                        {/* AUDIT HEADER */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center space-x-2 border-b border-slate-700/50 pb-1.5">
+                                                <div className="p-1 bg-purple-500/20 rounded">
+                                                    <Brain className="w-3 h-3 text-purple-300" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-purple-200 uppercase tracking-widest">
+                                                    Expert Design Audit
+                                                </span>
+                                            </div>
+                                            <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap pl-1">
+                                                {msg.strategySnapshot.reasoning}
+                                            </div>
+                                        </div>
+
+                                        {/* TECHNICAL CARD */}
+                                        <StrategyCard strategy={msg.strategySnapshot} modelConfig={activeModelConfig} />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -719,11 +738,15 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
+                    // NEW: Reasoning First with Description to enforce audit logic
+                    reasoning: { 
+                        type: Type.STRING,
+                        description: "MANDATORY: A professional 'Design Audit' paragraph. Critique the visual hierarchy, balance, and optical weight before proposing changes."
+                    },
                     method: { type: Type.STRING, enum: ['GEOMETRIC', 'GENERATIVE', 'HYBRID'] },
                     suggestedScale: { type: Type.NUMBER },
                     anchor: { type: Type.STRING, enum: ['TOP', 'CENTER', 'BOTTOM', 'STRETCH'] },
                     generativePrompt: { type: Type.STRING },
-                    reasoning: { type: Type.STRING },
                     clearance: { type: Type.BOOLEAN, description: "Set to true when resetting from Generative back to Geometric" },
                     knowledgeApplied: { type: Type.BOOLEAN, description: "Set to true ONLY if you explicitly used the provided Knowledge/Brand Rules to influence the layout." },
                     overrides: {
@@ -748,7 +771,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         required: ['allowedBleed', 'violationCount']
                     }
                 },
-                required: ['method', 'suggestedScale', 'anchor', 'generativePrompt', 'reasoning', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied']
+                required: ['reasoning', 'method', 'suggestedScale', 'anchor', 'generativePrompt', 'clearance', 'overrides', 'safetyReport', 'knowledgeApplied']
             }
         };
         
