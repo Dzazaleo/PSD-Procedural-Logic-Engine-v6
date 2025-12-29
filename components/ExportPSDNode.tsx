@@ -5,6 +5,7 @@ import { useProceduralStore } from '../store/ProceduralContext';
 import { findLayerByPath, writePsdFile } from '../services/psdService';
 import { Layer, Psd } from 'ag-psd';
 import { GoogleGenAI } from "@google/genai";
+import { AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
 // Helper: Calculate closest supported aspect ratio for Nano Banana
 const getClosestAspectRatio = (width: number, height: number): string => {
@@ -224,13 +225,23 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
     return { slotConnections: map, validationErrors: errors };
   }, [edges, id, payloadRegistry, resolvedRegistry]);
 
-  // 3. Status Calculation
+  // 3. Status Calculation & Safety Gating
   const totalSlots = containers.length;
   const filledSlots = slotConnections.size;
   const isTemplateReady = !!templateMetadata;
   
-  // PARTIAL SYNTHESIS LOGIC: Allow export if at least one slot is filled
-  const isExportReady = isTemplateReady && filledSlots > 0 && validationErrors.length === 0;
+  const activePayloads = Array.from(slotConnections.values());
+  
+  // Count blockers: Unconfirmed drafts and active synthesis
+  const unconfirmedDrafts = activePayloads.filter(p => {
+      // If a payload is transient or waiting, it's a blocker
+      return p.isTransient || p.status === 'awaiting_confirmation';
+  }).length;
+
+  const activeSynthesis = activePayloads.filter(p => p.isSynthesizing).length;
+
+  // PARTIAL SYNTHESIS LOGIC: Allow export if at least one slot is filled AND all active slots are confirmed/stable
+  const isExportReady = isTemplateReady && filledSlots > 0 && validationErrors.length === 0 && unconfirmedDrafts === 0 && activeSynthesis === 0;
   
   // 4. Export Logic
   const handleExport = async () => {
@@ -264,6 +275,8 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
           const findGenerativeLayers = (layers: TransformedLayer[]) => {
               for (const layer of layers) {
                   // FILTER: Only process generative layers if they are CONFIRMED
+                  // The Export Gate prevents reaching here if any top-level payload is unconfirmed,
+                  // but we double-check per layer for robustness.
                   if (layer.type === 'generative' && layer.generativePrompt && payload.isConfirmed) {
                       // LOOKUP PRIORITY:
                       // 1. Payload Preview URL (The "Baked" Asset from History/Confirmation)
@@ -428,6 +441,13 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
     }
   };
 
+  // Determine Button Text
+  let buttonText = "Export Final PSD";
+  if (isExporting) buttonText = exportStatus;
+  else if (activeSynthesis > 0) buttonText = "Synthesizing Assets...";
+  else if (unconfirmedDrafts > 0) buttonText = `Review ${unconfirmedDrafts} Designer Drafts`;
+  else if (filledSlots < totalSlots && filledSlots > 0) buttonText = `Export Partial PSD (${filledSlots}/${totalSlots})`;
+
   return (
     <div className="min-w-[300px] bg-slate-900 rounded-lg shadow-2xl border border-indigo-500 overflow-hidden font-sans">
       
@@ -472,6 +492,8 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
                   const payload = slotConnections.get(container.name);
                   const isGen = payload?.requiresGeneration || payload?.previewUrl; // Drafts also count as gen
                   const isConfirmed = payload?.isConfirmed;
+                  const isTransient = payload?.isTransient || payload?.status === 'awaiting_confirmation';
+                  const isSynthesizing = payload?.isSynthesizing;
 
                   return (
                       <div 
@@ -495,19 +517,35 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
                             title={`Input for ${container.name}`} 
                           />
                           
-                          <div className="flex flex-col flex-1 mr-2 overflow-hidden">
+                          <div className="flex flex-col flex-1 mr-2 overflow-hidden relative">
                               <span className={`text-xs font-medium truncate ${isFilled ? 'text-indigo-200' : 'text-slate-400'}`}>
                                   {container.name}
                               </span>
-                              {isGen && (
-                                  <div className="flex items-center space-x-1 mt-0.5">
-                                      <span className="text-[8px] text-purple-400 font-mono leading-none">
-                                          ✨ AI GENERATION
-                                      </span>
-                                      {!isConfirmed && (
-                                          <span className="text-[8px] text-yellow-500 font-bold leading-none" title="Not Confirmed (Will Fallback)">
-                                              (UNCONFIRMED)
-                                          </span>
+                              
+                              {/* STATUS BADGES */}
+                              {isFilled && (
+                                  <div className="flex items-center space-x-2 mt-1">
+                                      {isSynthesizing ? (
+                                          <div className="flex items-center space-x-1 bg-purple-900/50 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                                              <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
+                                              <span className="text-[8px] text-purple-200 font-medium tracking-wide">SYNTHESIZING</span>
+                                          </div>
+                                      ) : isGen ? (
+                                          !isConfirmed || isTransient ? (
+                                              <div className="flex items-center space-x-1 bg-amber-900/50 border border-amber-500/30 px-1.5 py-0.5 rounded animate-pulse">
+                                                  <AlertCircle className="w-3 h-3 text-amber-400" />
+                                                  <span className="text-[8px] text-amber-200 font-bold uppercase tracking-wide">Draft</span>
+                                              </div>
+                                          ) : (
+                                              <div className="flex items-center space-x-1 bg-emerald-900/50 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                                  <span className="text-[8px] text-emerald-200 font-bold uppercase tracking-wide">Vetted</span>
+                                              </div>
+                                          )
+                                      ) : (
+                                          <div className="flex items-center space-x-1 px-1 py-0.5">
+                                               <span className="text-[8px] text-slate-500 font-mono tracking-wide">GEOMETRIC</span>
+                                          </div>
                                       )}
                                   </div>
                               )}
@@ -557,21 +595,22 @@ export const ExportPSDNode = memo(({ id }: NodeProps) => {
           <button
             onClick={handleExport}
             disabled={!isExportReady || isExporting}
-            className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-all shadow-lg
+            className={`w-full py-2 px-4 rounded text-xs font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center space-x-2
                 ${isExportReady && !isExporting
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white cursor-pointer transform hover:-translate-y-0.5' 
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed border border-slate-600'}
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'}
             `}
           >
              {isExporting ? (
-                 <span className="flex items-center justify-center space-x-2">
+                 <>
                      <svg className="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                     <span className="truncate">{exportStatus}</span>
-                 </span>
+                     <span className="truncate">{buttonText}</span>
+                 </>
              ) : (
-                 filledSlots < totalSlots && filledSlots > 0
-                    ? `Export Partial PSD (${filledSlots}/${totalSlots})`
-                    : "Export Full PSD"
+                 <>
+                    {!isExportReady && unconfirmedDrafts > 0 && <AlertCircle className="w-3 h-3 text-amber-500" />}
+                    <span>{buttonText}</span>
+                 </>
              )}
           </button>
       </div>
