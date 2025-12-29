@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Optical-Mass Semantic Recomposition" and **EXECUTE** the changes.
+        GOAL: Perform "Optical-Mass Semantic Recomposition" with **CENTER-RELATIVE COORDINATES**.
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -640,34 +640,44 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
+        CRITICAL COORDINATE SYSTEM (THE "ZERO POINT" RULE):
+        1. ORIGIN (0,0): The (0,0) point is the GEOMETRIC CENTER of the Target Container.
+           - xOffset: 0 = Horizontally Centered.
+           - yOffset: 0 = Vertically Centered.
+        2. DIRECTIONALITY:
+           - Negative X (e.g., -200) = Move LEFT of center.
+           - Positive X (e.g., +200) = Move RIGHT of center.
+           - Negative Y (e.g., -200) = Move UP (Above center).
+           - Positive Y (e.g., +200) = Move DOWN (Below center).
+        3. SCALE LOGIC: 'individualScale' is a MULTIPLIER of the 'suggestedScale'.
+           - If global fit is 1.0, setting individualScale to 0.8 makes the layer 20% smaller than the global fit.
+           - Use this to create hierarchy (e.g., primary assets = 1.0, secondary metadata = 0.7).
+
         CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
-        Your design audit is useless without execution. You must translate every qualitative critique into quantitative data.
         1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
         2. QUANTIFY YOUR INTENT:
-           - "Reduce scale by 30%" -> becomes 'individualScale: 0.7'.
-           - "Nudge down optically" -> becomes a positive 'yOffset' value (e.g., 'yOffset: 45').
-           - "Center horizontally" -> becomes 'xOffset: 0' (relative to the target center, use negative values for left, positive for right).
+           - "Center horizontally" -> 'xOffset: 0'.
+           - "Place at bottom" -> 'yOffset: +[HalfHeight - Padding]'.
+           - "Place at top" -> 'yOffset: -[HalfHeight - Padding]'.
         3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' block.
 
         OPTICAL ALIGNMENT PROTOCOL (MANDATORY):
-        1. VISUAL MASS VS. BOUNDS: Do not rely on geometric centers. Identify the "Visual Center of Gravity" (the densest/most significant part of the artwork). Center associated text [layer-ID] relative to this mass, not the layer's box.
-        2. FRAME-WITHIN-A-FRAME: Treat primary assets as containers. For example, if a number belongs to a bottle, it should be optically centered within the "liquid area" of that bottle to create a cohesive silhouette.
-        3. SCANNING RHYTHM: Audit the "Negative Space" between elements. Avoid "Visual Collisions" where high-contrast elements bleed into each other. If the layout is crowded, reduce 'individualScale' for secondary metadata to let the primary assets breathe.
+        - Identify "Visual Center of Gravity" vs. geometric bounds.
+        - Frame primary assets (numbers) within their visual containers (bottles).
+        - Audit "Negative Space" to prevent visual collisions.
         
         GROUNDING & TRUTH:
-        - Link all observations to Metadata IDs [layer-ID].
-        - Cite [GLOBAL PROJECT KNOWLEDGE] rules for spacing and hierarchy.
-        - The Image is your source for "Visual Weight" analysis.
+        - Link observations to Metadata IDs [layer-ID].
+        - Cite Brand Rules where applicable.
 
         STRICT OPERATIONAL BOUNDARIES:
-        - NO CREATION: 'generativePrompt' MUST be "".
-        - NO DELETION: All layers must be preserved.
-        - NO CROPPING: Use scale and offsets only.
+        - NO CREATION ('generativePrompt': ""). NO DELETION. NO CROPPING.
         - METHOD 'GEOMETRIC'.
 
         JSON OUTPUT RULES:
-        - Your 'reasoning' must explain the "Optical Shift" (e.g., "Nudging [layer-ID] down to align with the visual mass of [anchor-ID]").
-        - 'inventoryVerified' check: Ensure all layers are recomposed without loss.
+        - 'reasoning': The qualitative design audit (The "Why").
+        - 'overrides': The quantitative execution data (The "How") using CENTER-RELATIVE offsets.
+        - 'inventoryVerified': true.
     `;
     
     if (knowledgeContext && knowledgeContext.rules) {
