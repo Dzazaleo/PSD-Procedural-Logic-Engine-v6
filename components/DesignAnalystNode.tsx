@@ -598,65 +598,74 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                 name: l.name,
                 type: l.type,
                 depth: depth,
+                // Raw coords for absolute spatial reasoning
+                x: l.coords.x,
+                y: l.coords.y,
+                width: l.coords.w,
+                height: l.coords.h,
+                // Relative coords for scalable reasoning
                 relX: (l.coords.x - sourceData.container.bounds.x) / sourceW,
                 relY: (l.coords.y - sourceData.container.bounds.y) / sourceH,
-                width: l.coords.w,
-                height: l.coords.h
             });
             if (l.children) { flat = flat.concat(flattenLayers(l.children, depth + 1)); }
         });
         return flat;
     };
 
+    // Increase slice to ensure enough context for the model
     const layerAnalysisData = flattenLayers(sourceData.layers as SerializableLayer[]);
 
     let prompt = `
-        ROLE: Precision Drafting Engine & Senior PSD Compositor.
-        GOAL: Perform "Geometry-First Semantic Recomposition" using a STRICT GRID SYSTEM.
-        
+        ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
+        GOAL: Perform a "Reasoning-First" Design Audit followed by Semantic Recomposition.
+
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
         - Target: ${targetData.name} (${targetW}x${targetH})
-        
-        LAYER HIERARCHY (JSON):
-        ${JSON.stringify(layerAnalysisData.slice(0, 40))} ... (Truncated)
 
-        CRITICAL GRID LOGIC:
-        1. Analyze the Target Aspect Ratio (${(targetW/targetH).toFixed(2)}) vs Source (${(sourceW/sourceH).toFixed(2)}).
-        2. If Target is narrower/taller, STACK elements vertically.
-        3. If Target is wider, distribute horizontally.
-        4. Calculate integer 'yOffset' and 'xOffset' relative to Target Top-Left (0,0).
-        5. Maintain visual hierarchy: Key elements (Titles) must be prominent.
+        LAYER HIERARCHY (JSON Analysis):
+        ${JSON.stringify(layerAnalysisData.slice(0, 50))} 
+        (List truncated to top 50 layers for token efficiency)
 
-        DECISION MATRIX (Strict Enforcement):
-        - METHOD 'GEOMETRIC': Default. Use purely geometric transforms (scale/translate). 'generativePrompt' MUST be empty string "".
-        - METHOD 'GENERATIVE': Use ONLY if user explicitly requests (e.g., "generate", "create", "nano banana") OR if aspect ratio mismatch is > 2.0.
-          IF GENERATIVE IS SELECTED:
-          - Set 'generativePrompt' to: "Generate a high-fidelity expansion. Use the attached sourceReference for style, lighting, and texture matching. Do not deviate from the original aesthetic."
-        - METHOD 'HYBRID': Use geometric layout for main elements but generate background fill.
-        
-        PIVOT PROTOCOL (Geometric Reset):
-        If the user requests to "undo generation", "reset", "use original pixels", "stop generating", or if the strategy is GEOMETRIC:
-        1. Set 'method' to 'GEOMETRIC'.
-        2. Set 'generativePrompt' to "" (empty string).
-        3. Set 'clearance' to true.
-        4. Reset 'suggestedScale' to optimal geometric fit.
+        PHASE 1: DESIGN AUDIT (Mandatory 'reasoning' Field)
+        Before calculating any coordinates, you must critique the layout transformation.
+        1. Aspect Ratio Delta: Compare Source (${(sourceW/sourceH).toFixed(2)}) vs Target (${(targetW/targetH).toFixed(2)}).
+           - TALLER Target? Requires vertical stacking (Rhythm: Header -> Hero -> Footer).
+           - WIDER Target? Requires horizontal distribution (Balance: Hero Left -> Copy Right).
+        2. Visual Mass Identification:
+           - Find the "Hero" (Bottle, Product, Character). It must anchor the optical center.
+           - Find "Typography" (Headlines, Lockups). Ensure readability and breathing room (padding).
+           - Find "Legal/UI". Anchor these to safe zones (corners/bottom).
+        3. Structural Critique:
+           - Identify risks: "Direct scaling will crop the logo," or "Header text will overlap the product."
 
-        FALLBACK PROTOCOL:
-        If standard scaling fails (leaves gaps > 10% or cuts content) AND you provide a 'generativePrompt':
-        1. Set 'method' to 'HYBRID' or 'GENERATIVE'.
-        2. Prefix 'reasoning' with "[FALLBACK_REQUIRED]".
-        3. Provide the specific 'generativePrompt'.
+        PHASE 2: SEMANTIC RECOMPOSITION (Populate 'overrides')
+        Using your audit, calculate specific 'xOffset', 'yOffset', and 'individualScale' for layers that need adjustment.
+        - OPTICAL CENTERING: Do not just mathematical center. Account for visual weight.
+        - PRESERVE INTEGRITY: Do not distort aspect ratios of logos or products. Use 'individualScale' to fit them safely.
+        - STRICT BOUNDARIES: Ensure no critical content bleeds outside the Target (${targetW}x${targetH}).
+
+        OPERATIONAL GUARDRAILS:
+        1. NO NEW ELEMENTS: You cannot add pixels, layers, or effects.
+        2. NO DELETION: Do not remove layers. If they don't fit, scale them down or move them to overflow areas.
+        3. NO GENERATION: 'generativePrompt' MUST be an empty string "". We are compositing existing pixels.
+        4. METHOD: Use 'GEOMETRIC'.
+
+        OUTPUT INSTRUCTIONS:
+        - Populate 'reasoning' with your Phase 1 Audit.
+        - Populate 'overrides' with your Phase 2 Calculations.
+        - Ensure JSON is valid.
     `;
     
-    // Knowledge Injection (Only if not null)
+    // Knowledge Injection
     if (knowledgeContext && knowledgeContext.rules) {
-        prompt = `[GLOBAL PROJECT KNOWLEDGE - MANDATORY]\n${knowledgeContext.rules}\n\nThe above rules override standard geometric defaults. Ensure 'overrides' and 'method' choices strictly adhere to these constraints.\n\n` + prompt;
+        prompt = `[GLOBAL BRAND KNOWLEDGE - PRIORITY 1]\n${knowledgeContext.rules}\n\nThe above brand rules override standard design practices. If the rules say "Logo must be top-right", you must override geometric centering to place it top-right.\n\n` + prompt;
     }
     
     if (isRefining) {
-        prompt += `\n\nUSER FEEDBACK RECEIVED. Adjust the 'overrides' array to satisfy the user request while maintaining valid JSON structure and boundary safety.`;
+        prompt += `\n\n[INTERACTIVE REFINEMENT]: The user has provided feedback in the chat history. You must adjust the 'overrides' to satisfy their request while maintaining the design integrity defined above.`;
     }
+    
     return prompt;
   };
 
