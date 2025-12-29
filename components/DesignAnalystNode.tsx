@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Zero-Loss Semantic Recomposition".
+        GOAL: Perform "Optical-Mass Semantic Recomposition".
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -640,21 +640,25 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
-        STRICT OPERATIONAL BOUNDARIES (NON-NEGOTIABLE):
-        1. NO CREATION: You are forbidden from adding new visual elements, effects, or layers. The 'generativePrompt' field MUST be an empty string "".
-        2. NO DELETION: Every Layer ID provided in the JSON [layer-ID] is a mandatory component. You cannot "remove" or "hide" a layer to save space or simplify the layout.
-        3. NO CROPPING: You cannot crop assets. Every asset must be fully visible. Use 'individualScale' within the 'overrides' array to ensure large assets fit within the target container bounds.
-        4. INVENTORY CHECK: Before finalizing your JSON, verify that 100% of the source layers are accounted for in your plan.
+        OPTICAL ALIGNMENT PROTOCOL (MANDATORY):
+        1. VISUAL MASS VS. BOUNDS: Do not rely on geometric centers. Identify the "Visual Center of Gravity" (the densest/most significant part of the artwork). Center associated text [layer-ID] relative to this mass, not the layer's box.
+        2. FRAME-WITHIN-A-FRAME: Treat primary assets as containers. For example, if a number belongs to a bottle, it should be optically centered within the "liquid area" of that bottle to create a cohesive silhouette.
+        3. SCANNING RHYTHM: Audit the "Negative Space" between elements. Avoid "Visual Collisions" where high-contrast elements bleed into each other. If the layout is crowded, reduce 'individualScale' for secondary metadata to let the primary assets breathe.
         
-        DESIGNER AUDIT STEPS:
-        - Link visual observations to Metadata IDs [layer-ID].
-        - Cite Brand Rules from [GLOBAL PROJECT KNOWLEDGE] to justify recomposition choices.
-        - Identify the "Visual Anchor" and ensure it is not obscured by secondary metadata.
+        GROUNDING & TRUTH:
+        - Link all observations to Metadata IDs [layer-ID].
+        - Cite [GLOBAL PROJECT KNOWLEDGE] rules for spacing and hierarchy.
+        - The Image is your source for "Visual Weight" analysis.
+
+        STRICT OPERATIONAL BOUNDARIES:
+        - NO CREATION: 'generativePrompt' MUST be "".
+        - NO DELETION: All layers must be preserved.
+        - NO CROPPING: Use scale and offsets only.
+        - METHOD 'GEOMETRIC'.
 
         JSON OUTPUT RULES:
-        - Your 'reasoning' must explicitly confirm: "Inventory Verified: All source layers preserved."
-        - Use 'overrides' for all semantic adjustments (xOffset, yOffset, individualScale).
-        - 'method' must be 'GEOMETRIC'.
+        - Your 'reasoning' must explain the "Optical Shift" (e.g., "Nudging [layer-ID] down to align with the visual mass of [anchor-ID]").
+        - 'inventoryVerified' check: Ensure all layers are recomposed without loss.
     `;
     
     if (knowledgeContext && knowledgeContext.rules) {
