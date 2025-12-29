@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps, useEdges, useReactFlow, useNodes } from 'r
 import { PSDNodeData, SerializableLayer, TransformedPayload, TransformedLayer, MAX_BOUNDARY_VIOLATION_PERCENT, LayoutStrategy, LayoutDirective } from '../types';
 import { useProceduralStore } from '../store/ProceduralContext';
 import { GoogleGenAI } from "@google/genai";
-import { Check, Sparkles, Info, Layers, Box, Cpu, Move, ShieldAlert } from 'lucide-react';
+import { Check, Sparkles, Info, Layers, Box, Cpu, Move, ShieldAlert, Ruler } from 'lucide-react';
 
 interface InstanceData {
   index: number;
@@ -279,7 +279,7 @@ const OverrideInspector = ({
                     {directives.map((d, i) => (
                         <div key={i} className="flex items-center justify-between bg-pink-500/10 px-1.5 py-1 rounded">
                             <div className="flex items-center space-x-1">
-                                <Move className="w-3 h-3 text-pink-300" />
+                                <Ruler className="w-3 h-3 text-pink-300" />
                                 <span className="text-[9px] text-pink-200 font-mono font-bold">{d.action}</span>
                             </div>
                             <span className="text-[8px] text-pink-300/70">
@@ -397,7 +397,9 @@ const RemapperInstanceRow = memo(({
     
     const isEffectiveGenerating = !!isGeneratingPreview[instance.index] || !!storeIsSynthesizing;
 
-    const hasOverrides = (instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0) || (instance.directivesApplied && instance.directivesApplied.length > 0);
+    const hasOverrides = (instance.source.aiStrategy?.overrides && instance.source.aiStrategy.overrides.length > 0);
+    const directives = instance.directivesApplied || [];
+    const hasDirectives = directives.length > 0;
 
     // Process Breakdown Stats (Audit)
     const audit = useMemo(() => {
@@ -483,10 +485,10 @@ const RemapperInstanceRow = memo(({
                       <div className="flex justify-between items-center">
                           <div className="flex items-center space-x-2">
                               <span className="text-[10px] text-emerald-400 font-bold tracking-wide">READY</span>
-                              {instance.strategyUsed && (
+                              {(instance.strategyUsed || hasDirectives) && (
                                   <div className="flex items-center gap-1">
                                       <span className="text-[8px] bg-pink-500/20 text-pink-300 px-1 rounded border border-pink-500/40">AI ENHANCED</span>
-                                      {hasOverrides && (
+                                      {(hasOverrides || hasDirectives) && (
                                           <button 
                                             onClick={(e) => { e.stopPropagation(); setInspectorOpen(!isInspectorOpen); }}
                                             className={`p-0.5 rounded transition-colors ${isInspectorOpen ? 'text-pink-200 bg-pink-500/30' : 'text-slate-500 hover:text-pink-300'}`}
@@ -513,6 +515,18 @@ const RemapperInstanceRow = memo(({
                       <div className={`w-full h-1 rounded overflow-hidden mt-1 ${instance.strategyUsed ? 'bg-pink-900' : 'bg-slate-900'}`}>
                          <div className={`h-full ${instance.strategyUsed ? 'bg-pink-500' : 'bg-emerald-500'}`} style={{ width: '100%' }}></div>
                       </div>
+
+                      {/* Directives Audit Badge */}
+                      {hasDirectives && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                              {directives.map((d, i) => (
+                                  <div key={i} className="flex items-center space-x-1 px-1.5 py-0.5 bg-blue-900/30 border border-blue-500/30 rounded text-[8px] text-blue-300">
+                                      <Ruler className="w-2.5 h-2.5" />
+                                      <span>{d.action}</span>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
 
                       {/* Detailed Process Audit Breakdown */}
                       {audit && (
@@ -819,7 +833,7 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
         // 3. Compute Payload
         let payload: TransformedPayload | null = null;
         let strategyUsed = false;
-        let appliedDirectives: LayoutDirective[] = [];
+        let appliedDirectives: LayoutDirective[] = []; // Explicit Scope
 
         if (sourceData.ready && targetData.ready) {
             const sourceRect = sourceData.originalBounds;
@@ -853,10 +867,11 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                 if (strategy.layoutDirectives) {
                     const directives: LayoutDirective[] = strategy.layoutDirectives;
                     // Match against containerID or generic slot reference
-                    const activeDirectives = directives.filter(d => d.containerId === `target-out-${i}`);
+                    const activeDirectives = directives.filter(d => 
+                        d.containerId === targetData.name || d.containerId === `target-out-${i}`
+                    );
                     
                     if (activeDirectives.length > 0) {
-                        appliedDirectives = activeDirectives;
                         
                         activeDirectives.forEach(dir => {
                             // 1. SCALE
@@ -891,6 +906,8 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
                                 anchorY += dir.params.y || 0;
                             }
                         });
+
+                        appliedDirectives = activeDirectives;
 
                         // SAFETY CLAMPING (30% Tolerance)
                         const contentW = sourceRect.w * scale;

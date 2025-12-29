@@ -82,8 +82,9 @@ export interface LayerOverride {
   individualScale: number;
 }
 
+// --- NEW: Spatial Directives for Geometric Execution Engine ---
 export interface LayoutDirective {
-  containerId: string; // Explicitly matches target-out-{n}
+  containerId: string;
   action: 'ANCHOR' | 'SCALE' | 'OFFSET';
   params: {
     anchorPoint?: 'TOP_LEFT' | 'CENTER' | 'BOTTOM_RIGHT';
@@ -93,6 +94,7 @@ export interface LayoutDirective {
   };
   reasoning: string;
 }
+// -----------------------------------------------------------
 
 export interface LayoutStrategy {
   method?: 'GEOMETRIC' | 'GENERATIVE' | 'HYBRID';
@@ -101,7 +103,7 @@ export interface LayoutStrategy {
   generativePrompt: string;
   reasoning: string;
   overrides?: LayerOverride[];
-  layoutDirectives?: LayoutDirective[]; // Structured instructions for the Remapper
+  layoutDirectives?: LayoutDirective[]; // Extended Protocol
   safetyReport?: {
     allowedBleed: boolean;
     violationCount: number;
