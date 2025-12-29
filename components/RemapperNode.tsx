@@ -211,9 +211,22 @@ const calculateOverrideMetrics = (
                 const geomX = anchorX + (relX * (sourceRect.w * globalScale));
                 const geomY = anchorY + (relY * (sourceRect.h * globalScale));
 
-                // Semantic Position
-                const finalX = targetRect.x + override.xOffset;
-                const finalY = targetRect.y + override.yOffset;
+                // Semantic Position (Centroid-Based)
+                // Calculate Scale
+                const layerScaleX = globalScale * override.individualScale;
+                const layerScaleY = globalScale * override.individualScale;
+                
+                // New Dimensions
+                const newW = layer.coords.w * layerScaleX;
+                const newH = layer.coords.h * layerScaleY;
+
+                // Target Center
+                const targetCenterX = targetRect.x + (targetRect.w / 2);
+                const targetCenterY = targetRect.y + (targetRect.h / 2);
+
+                // Final Position: Center + Offset - HalfSize
+                const finalX = targetCenterX + override.xOffset - (newW / 2);
+                const finalY = targetCenterY + override.yOffset - (newH / 2);
 
                 metrics.push({
                     layerId: layer.id,
@@ -816,27 +829,51 @@ export const RemapperNode = memo(({ id, data }: NodeProps<PSDNodeData>) => {
 
             const transformLayers = (layers: SerializableLayer[], parentDeltaX = 0, parentDeltaY = 0): TransformedLayer[] => {
               return layers.map(layer => {
+                // 1. Calculate Standard Geometric Position (Baseline)
                 const relX = (layer.coords.x - sourceRect.x) / sourceRect.w;
                 const relY = (layer.coords.y - sourceRect.y) / sourceRect.h;
                 const geomX = anchorX + (relX * (sourceRect.w * scale));
                 const geomY = anchorY + (relY * (sourceRect.h * scale));
-                let finalX = geomX + parentDeltaX;
-                let finalY = geomY + parentDeltaY;
+                
                 let layerScaleX = scale;
                 let layerScaleY = scale;
+                
+                // Default Final Position (Geometric)
+                let finalX = geomX + parentDeltaX;
+                let finalY = geomY + parentDeltaY;
+
+                // 2. CHECK FOR OVERRIDES
                 const override = strategy?.overrides?.find(o => o.layerId === layer.id);
                 
                 if (override) {
-                   finalX = targetRect.x + override.xOffset;
-                   finalY = targetRect.y + override.yOffset;
+                   // A. Apply Scale Multiplier FIRST
                    layerScaleX *= override.individualScale;
                    layerScaleY *= override.individualScale;
+                   
+                   // B. Calculate Layer's New Dimensions
+                   const newW = layer.coords.w * layerScaleX;
+                   const newH = layer.coords.h * layerScaleY;
+
+                   // C. Calculate Target Geometric Center
+                   const targetCenterX = targetRect.x + (targetRect.w / 2);
+                   const targetCenterY = targetRect.y + (targetRect.h / 2);
+
+                   // D. Apply Center-Relative Offset (Centroid Math)
+                   // Position = (ContainerCenter) + (Offset) - (HalfLayerSize)
+                   finalX = targetCenterX + override.xOffset - (newW / 2);
+                   finalY = targetCenterY + override.yOffset - (newH / 2);
                 }
 
+                // 3. Boundary Safety (Bleed Check)
                 const bleedY = targetRect.h * MAX_BOUNDARY_VIOLATION_PERCENT;
                 const minY = targetRect.y - bleedY;
                 const maxY = targetRect.y + targetRect.h + bleedY;
-                finalY = Math.max(minY, Math.min(finalY, maxY));
+                
+                // Only clamp if we are NOT manually overriding (Designer might want intentional bleed)
+                if (!override) {
+                    finalY = Math.max(minY, Math.min(finalY, maxY));
+                }
+
                 const newW = layer.coords.w * layerScaleX;
                 const newH = layer.coords.h * layerScaleY;
 
