@@ -598,74 +598,54 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                 name: l.name,
                 type: l.type,
                 depth: depth,
-                // Raw coords for absolute spatial reasoning
-                x: l.coords.x,
-                y: l.coords.y,
-                width: l.coords.w,
-                height: l.coords.h,
-                // Relative coords for scalable reasoning
                 relX: (l.coords.x - sourceData.container.bounds.x) / sourceW,
                 relY: (l.coords.y - sourceData.container.bounds.y) / sourceH,
+                width: l.coords.w,
+                height: l.coords.h
             });
             if (l.children) { flat = flat.concat(flattenLayers(l.children, depth + 1)); }
         });
         return flat;
     };
 
-    // Increase slice to ensure enough context for the model
     const layerAnalysisData = flattenLayers(sourceData.layers as SerializableLayer[]);
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform a "Reasoning-First" Design Audit followed by Semantic Recomposition.
-
+        GOAL: Perform "Reasoning-First Semantic Recomposition". You must critique the composition before calculating coordinates.
+        
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
         - Target: ${targetData.name} (${targetW}x${targetH})
+        
+        LAYER HIERARCHY (JSON):
+        ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
-        LAYER HIERARCHY (JSON Analysis):
-        ${JSON.stringify(layerAnalysisData.slice(0, 50))} 
-        (List truncated to top 50 layers for token efficiency)
+        DESIGN DIRECTIVES (Strict Enforcement):
+        1. REASONING-FIRST AUDIT: Your 'reasoning' field must contain a professional design critique. Identify issues such as visual crowding, lack of hierarchy, or poor optical centering. 
+        2. OPTICAL VS GEOMETRIC: Do not just center bounding boxes. Analyze the "Visual Mass" (e.g., the belly of a potion bottle) and align text/elements to that mass.
+        3. NEGATIVE SPACE: Prioritize legibility. If elements are "bleeding" into each other (e.g., text labels overlapping), reduce scale and increase padding to create distinct scanning rhythms.
+        4. HIERARCHY PRESERVATION: Key focal points must remain dominant. Secondary metadata should be tucked into negative space without obscuring primary assets.
 
-        PHASE 1: DESIGN AUDIT (Mandatory 'reasoning' Field)
-        Before calculating any coordinates, you must critique the layout transformation.
-        1. Aspect Ratio Delta: Compare Source (${(sourceW/sourceH).toFixed(2)}) vs Target (${(targetW/targetH).toFixed(2)}).
-           - TALLER Target? Requires vertical stacking (Rhythm: Header -> Hero -> Footer).
-           - WIDER Target? Requires horizontal distribution (Balance: Hero Left -> Copy Right).
-        2. Visual Mass Identification:
-           - Find the "Hero" (Bottle, Product, Character). It must anchor the optical center.
-           - Find "Typography" (Headlines, Lockups). Ensure readability and breathing room (padding).
-           - Find "Legal/UI". Anchor these to safe zones (corners/bottom).
-        3. Structural Critique:
-           - Identify risks: "Direct scaling will crop the logo," or "Header text will overlap the product."
+        OPERATIONAL CONSTRAINTS:
+        - NO NEW ELEMENTS: You cannot add effects, shadows, text, or assets.
+        - NO DELETION/CROPPING: Every layer provided in the JSON must be present in the output. Do not "remove" layers to save space.
+        - METHOD 'GEOMETRIC': For this phase, use purely geometric transforms. 'generativePrompt' MUST be an empty string "".
 
-        PHASE 2: SEMANTIC RECOMPOSITION (Populate 'overrides')
-        Using your audit, calculate specific 'xOffset', 'yOffset', and 'individualScale' for layers that need adjustment.
-        - OPTICAL CENTERING: Do not just mathematical center. Account for visual weight.
-        - PRESERVE INTEGRITY: Do not distort aspect ratios of logos or products. Use 'individualScale' to fit them safely.
-        - STRICT BOUNDARIES: Ensure no critical content bleeds outside the Target (${targetW}x${targetH}).
-
-        OPERATIONAL GUARDRAILS:
-        1. NO NEW ELEMENTS: You cannot add pixels, layers, or effects.
-        2. NO DELETION: Do not remove layers. If they don't fit, scale them down or move them to overflow areas.
-        3. NO GENERATION: 'generativePrompt' MUST be an empty string "". We are compositing existing pixels.
-        4. METHOD: Use 'GEOMETRIC'.
-
-        OUTPUT INSTRUCTIONS:
-        - Populate 'reasoning' with your Phase 1 Audit.
-        - Populate 'overrides' with your Phase 2 Calculations.
-        - Ensure JSON is valid.
+        PIVOT PROTOCOL:
+        If the user requests to "reset", "stop generating", or if the layout is crowded:
+        1. Set 'method' to 'GEOMETRIC'.
+        2. Set 'generativePrompt' to "".
+        3. Use the 'overrides' array to satisfy readability (adjusting xOffset, yOffset, and individualScale).
     `;
     
-    // Knowledge Injection
     if (knowledgeContext && knowledgeContext.rules) {
-        prompt = `[GLOBAL BRAND KNOWLEDGE - PRIORITY 1]\n${knowledgeContext.rules}\n\nThe above brand rules override standard design practices. If the rules say "Logo must be top-right", you must override geometric centering to place it top-right.\n\n` + prompt;
+        prompt = `[GLOBAL PROJECT KNOWLEDGE - MANDATORY]\n${knowledgeContext.rules}\n\nApply the above brand rules to your critique and recomposition.\n\n` + prompt;
     }
     
     if (isRefining) {
-        prompt += `\n\n[INTERACTIVE REFINEMENT]: The user has provided feedback in the chat history. You must adjust the 'overrides' to satisfy their request while maintaining the design integrity defined above.`;
+        prompt += `\n\nUSER REFINEMENT: Adjust the 'overrides' based on user feedback while maintaining the Expert Designer persona and non-destructive rules.`;
     }
-    
     return prompt;
   };
 
