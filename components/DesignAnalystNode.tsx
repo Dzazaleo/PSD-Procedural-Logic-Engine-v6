@@ -608,6 +608,11 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
     const sourceH = sourceData.container.bounds.h;
     const targetW = targetData.bounds.w;
     const targetH = targetData.bounds.h;
+    
+    // CALCULATE GLOBAL SCALE FOR CONTEXT
+    const ratioX = targetW / sourceW;
+    const ratioY = targetH / sourceH;
+    const globalScale = Math.min(ratioX, ratioY).toFixed(3);
 
     const flattenLayers = (layers: SerializableLayer[], depth = 0): any[] => {
         let flat: any[] = [];
@@ -631,32 +636,36 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Optical-Mass Semantic Recomposition" with **CENTER-RELATIVE COORDINATES**.
+        GOAL: Perform "Optical-Mass Semantic Recomposition" with CENTER-RELATIVE COORDINATES.
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
         - Target: ${targetData.name} (${targetW}x${targetH})
+        - CURRENT GLOBAL AUTO-SCALE: ${globalScale}x (The engine defaults to this zoom level).
         
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
+        CRITICAL SCALAR NORMALIZATION (COUNTER-SCALING):
+        1. UNDERSTAND THE ZOOM: 'individualScale' multiplies the Global Auto-Scale.
+           - If Auto-Scale is ${globalScale}x, setting 'individualScale: 1.0' keeps that zoom.
+        2. COUNTERACT BLOAT: If Auto-Scale is > 1.2, text and UI elements will likely be HUGE.
+           - You MUST use 'individualScale' < 1.0 (e.g., 0.6 or 0.7) to shrink them back to a tasteful size.
+        3. HIERARCHY: Primary assets (bottles) can stay at 1.0. Secondary metadata (labels) should be 0.6 - 0.8.
+
         CRITICAL COORDINATE SYSTEM (THE "ZERO POINT" RULE):
         1. ORIGIN (0,0): The (0,0) point is the GEOMETRIC CENTER of the Target Container.
-           - xOffset: 0 = Horizontally Centered.
-           - yOffset: 0 = Vertically Centered.
         2. DIRECTIONALITY:
            - Negative X (e.g., -200) = Move LEFT of center.
            - Positive X (e.g., +200) = Move RIGHT of center.
            - Negative Y (e.g., -200) = Move UP (Above center).
            - Positive Y (e.g., +200) = Move DOWN (Below center).
-        3. SCALE LOGIC: 'individualScale' is a MULTIPLIER of the 'suggestedScale'.
-           - If global fit is 1.0, setting individualScale to 0.8 makes the layer 20% smaller than the global fit.
-           - Use this to create hierarchy (e.g., primary assets = 1.0, secondary metadata = 0.7).
 
         CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
         1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
         2. QUANTIFY YOUR INTENT:
            - "Center horizontally" -> 'xOffset: 0'.
+           - "Shrink huge text" -> 'individualScale: 0.6'.
            - "Place at bottom" -> 'yOffset: +[HalfHeight - Padding]'.
            - "Place at top" -> 'yOffset: -[HalfHeight - Padding]'.
         3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' block.
