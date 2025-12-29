@@ -4,7 +4,7 @@ import { PSDNodeData, LayoutStrategy, SerializableLayer, ChatMessage, AnalystIns
 import { useProceduralStore } from '../store/ProceduralContext';
 import { getSemanticThemeObject, findLayerByPath } from '../services/psdService';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Brain, BrainCircuit, Ban, ClipboardList } from 'lucide-react';
+import { Brain, BrainCircuit, Ban, Ruler, Move, Maximize } from 'lucide-react';
 import { Psd } from 'ag-psd';
 
 // Define the exact union type for model keys to match PSDNodeData
@@ -53,6 +53,7 @@ const MODELS: Record<ModelKey, ModelConfig> = {
 const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfig }> = ({ strategy, modelConfig }) => {
     const overrideCount = strategy.overrides?.length || 0;
     const directiveCount = strategy.layoutDirectives?.length || 0;
+    const directives = strategy.layoutDirectives || [];
 
     // Determine method color badge
     let methodColor = 'text-slate-400 border-slate-600';
@@ -108,18 +109,53 @@ const StrategyCard: React.FC<{ strategy: LayoutStrategy, modelConfig: ModelConfi
              
              <div className="grid grid-cols-2 gap-4 mt-1">
                 <div>
-                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Directives</span>
-                    <span className={`text-sm font-mono ${directiveCount > 0 ? 'text-indigo-400 font-bold' : 'text-slate-400'}`}>
-                        {directiveCount} Actions
-                    </span>
+                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Global Scale</span>
+                    <span className="text-slate-200 font-mono text-sm">{strategy.suggestedScale.toFixed(3)}x</span>
                 </div>
                 <div>
-                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Overrides</span>
+                    <span className="block text-slate-500 text-[10px] uppercase tracking-wider">Modifications</span>
                     <span className={`text-sm ${overrideCount > 0 ? 'text-pink-400 font-bold' : 'text-slate-400'}`}>
                         {overrideCount} Layers
                     </span>
                 </div>
              </div>
+
+             {/* DIRECTIVE VISUALIZER: The Audit Log */}
+             {directives.length > 0 && (
+                 <div className="mt-2 space-y-1 bg-black/20 rounded p-1.5 border border-white/5">
+                     <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                         <Ruler className="w-3 h-3" /> Layout Directives
+                     </div>
+                     {directives.map((d, i) => (
+                         <div key={i} className="flex items-center justify-between bg-slate-900/80 p-1.5 rounded border border-slate-700/50 group hover:border-blue-500/30 transition-colors">
+                             <div className="flex items-center space-x-2">
+                                 {/* Icon based on Action */}
+                                 {d.action === 'SCALE' && <Maximize className="w-3 h-3 text-emerald-400" />}
+                                 {d.action === 'OFFSET' && <Move className="w-3 h-3 text-blue-400" />}
+                                 {d.action === 'ANCHOR' && <div className="w-3 h-3 border border-orange-400 rounded-sm relative"><div className="absolute inset-0.5 bg-orange-400 opacity-50"></div></div>}
+                                 
+                                 <div className="flex flex-col">
+                                     <span className="text-[9px] font-bold text-slate-200 leading-none">
+                                         {d.action} <span className="opacity-50 mx-1">|</span> <span className="text-slate-400">{d.containerId}</span>
+                                     </span>
+                                     {d.reasoning && (
+                                         <span className="text-[8px] text-slate-500 truncate max-w-[140px] italic">
+                                             "{d.reasoning}"
+                                         </span>
+                                     )}
+                                 </div>
+                             </div>
+                             
+                             {/* Parameter Value */}
+                             <div className="text-[9px] font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                                 {d.action === 'SCALE' && `${d.params.scaleFactor?.toFixed(2)}x`}
+                                 {d.action === 'OFFSET' && `x:${d.params.x} y:${d.params.y}`}
+                                 {d.action === 'ANCHOR' && d.params.anchorPoint}
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
 
              {strategy.safetyReport && strategy.safetyReport.violationCount > 0 && (
                  <div className="bg-orange-900/30 text-orange-200 p-2 rounded flex items-center space-x-2">
@@ -300,30 +336,9 @@ const InstanceRow: React.FC<InstanceRowProps> = ({
                     )}
                     {state.chatHistory.map((msg, idx) => (
                         <div key={msg.id || idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                            <div className={`max-w-[95%] rounded border p-3 text-xs leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-slate-800 border-slate-600 text-slate-200' : `bg-slate-800/50 ${activeModelConfig.badgeClass.replace('bg-', 'border-').split(' ')[0]} text-slate-300`}`}>
+                            <div className={`max-w-[95%] rounded border p-2 text-xs leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-slate-800 border-slate-600 text-slate-200' : `bg-slate-800/50 ${activeModelConfig.badgeClass.replace('bg-', 'border-').split(' ')[0]} text-slate-300`}`}>
                                 {msg.parts?.[0]?.text && msg.role === 'user' && (<div className="whitespace-pre-wrap break-words">{msg.parts[0].text}</div>)}
-                                
-                                {msg.role === 'model' && msg.strategySnapshot && (
-                                    <div className="flex flex-col gap-3">
-                                        {/* AUDIT HEADER */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center space-x-2 border-b border-slate-700/50 pb-1.5">
-                                                <div className="p-1 bg-purple-500/20 rounded">
-                                                    <Brain className="w-3 h-3 text-purple-300" />
-                                                </div>
-                                                <span className="text-[10px] font-bold text-purple-200 uppercase tracking-widest">
-                                                    Expert Design Audit
-                                                </span>
-                                            </div>
-                                            <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap pl-1">
-                                                {msg.strategySnapshot.reasoning}
-                                            </div>
-                                        </div>
-
-                                        {/* TECHNICAL CARD */}
-                                        <StrategyCard strategy={msg.strategySnapshot} modelConfig={activeModelConfig} />
-                                    </div>
-                                )}
+                                {msg.strategySnapshot && (<div className="mt-1"><StrategyCard strategy={msg.strategySnapshot} modelConfig={activeModelConfig} /></div>)}
                             </div>
                         </div>
                     ))}
