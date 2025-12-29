@@ -666,15 +666,16 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         CRITICAL LAYOUT MANIFEST (SEMANTIC-TO-GEOMETRIC BRIDGE):
         You must output a structured 'layoutDirectives' array to execute your design intent.
-        1. containerId: Must be strictly 'target-out-${index}' (e.g. 'target-out-0' for the current analysis context).
+        1. containerId: Must match the Target Container Name provided above: '${targetData.name}'.
         2. action: 
            - 'SCALE': Fix hierarchy. params: { scaleFactor: 1.2 } (Grow) or 0.8 (Shrink).
            - 'OFFSET': Fix whitespace/centering. params: { x: 50, y: -20 }.
-           - 'ANCHOR': Fix alignment. params: { anchorPoint: 'TOP_LEFT' }.
-        3. MAPPING RULE: 
-           - "Too small" -> SCALE > 1.0.
-           - "Too big" -> SCALE < 1.0.
-           - "Off-center" -> OFFSET or ANCHOR.
+           - 'ANCHOR': Fix alignment. params: { anchorPoint: 'TOP_LEFT', 'CENTER', 'BOTTOM_RIGHT' }.
+        3. MAPPING RULE (DESIGN-TO-MATH): 
+           - "Too small" or "Weak Hierarchy" -> SCALE > 1.0 (e.g., 1.2x).
+           - "Too big" or "Overwhelming" -> SCALE < 1.0 (e.g., 0.8x).
+           - "Imbalanced Whitespace" -> OFFSET (Shift x/y to balance negative space).
+           - "Bad Alignment" -> ANCHOR (Re-orient origin).
 
         CRITICAL EXECUTION PROTOCOL (THE "MATH BRIDGE"):
         1. IF YOU CRITIQUE IT, YOU MUST OVERRIDE IT: If your 'reasoning' mentions that a layer [layer-ID] is too big, too crowded, or off-center, that specific [layer-ID] **MUST** appear in the 'overrides' array.
@@ -683,7 +684,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
            - "Shrink huge text" -> 'individualScale: 0.6'.
            - "Place at bottom" -> 'yOffset: +[HalfHeight - Padding]'.
            - "Place at top" -> 'yOffset: -[HalfHeight - Padding]'.
-        3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' block.
+        3. FINAL VERIFICATION STEP: Before outputting JSON, review your 'reasoning'. For every assertion made, confirm there is corresponding math in the 'overrides' or 'layoutDirectives' block.
 
         OPTICAL ALIGNMENT PROTOCOL (MANDATORY):
         - Identify "Visual Center of Gravity" vs. geometric bounds.
@@ -700,8 +701,8 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
         JSON OUTPUT RULES:
         - 'reasoning': The qualitative design audit (The "Why").
-        - 'layoutDirectives': The high-level geometric instructions for the Remapper.
-        - 'overrides': The quantitative execution data (The "How") using CENTER-RELATIVE offsets.
+        - 'layoutDirectives': The high-level geometric instructions for the Remapper (Container Level).
+        - 'overrides': The quantitative execution data (The "How") using CENTER-RELATIVE offsets (Layer Level).
         - 'inventoryVerified': true.
     `;
     
@@ -802,7 +803,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
                         items: {
                             type: Type.OBJECT,
                             properties: {
-                                containerId: { type: Type.STRING, description: "Must match target-out-{n}" },
+                                containerId: { type: Type.STRING, description: "The exact name of the target container (e.g. 'SYMBOLS', 'BG') to apply this directive to." },
                                 action: { type: Type.STRING, enum: ['ANCHOR', 'SCALE', 'OFFSET'] },
                                 params: {
                                     type: Type.OBJECT,
