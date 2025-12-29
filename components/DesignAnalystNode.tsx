@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Knowledge-Anchored Semantic Recomposition".
+        GOAL: Perform "Zero-Loss Semantic Recomposition".
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -640,26 +640,21 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
-        KNOWLEDGE INTEGRATION PROTOCOL (MANDATORY):
-        1. KNOWLEDGE AS TRUTH: The provided [GLOBAL PROJECT KNOWLEDGE] rules are Hard Constraints. They override your personal aesthetic preferences if a conflict exists.
-        2. RULE CITATION: Your 'reasoning' must explicitly cite which Brand Rule or Visual Anchor pattern you are following. (e.g., "Per Brand Rule #1..." or "Matching the spacing rhythm of Visual Anchor #2...").
-        3. VISUAL ANCHOR ANALYSIS: Study the attached Visual Reference images for Spatial Rhythm. If the references show airy layouts, maximize white space. If they show dense layouts, tighten the composition.
+        STRICT OPERATIONAL BOUNDARIES (NON-NEGOTIABLE):
+        1. NO CREATION: You are forbidden from adding new visual elements, effects, or layers. The 'generativePrompt' field MUST be an empty string "".
+        2. NO DELETION: Every Layer ID provided in the JSON [layer-ID] is a mandatory component. You cannot "remove" or "hide" a layer to save space or simplify the layout.
+        3. NO CROPPING: You cannot crop assets. Every asset must be fully visible. Use 'individualScale' within the 'overrides' array to ensure large assets fit within the target container bounds.
+        4. INVENTORY CHECK: Before finalizing your JSON, verify that 100% of the source layers are accounted for in your plan.
         
-        GROUNDING PROTOCOL:
-        - Link every visual observation to a Metadata ID [layer-ID].
-        - Use the Image for visual auditing and JSON for coordinate mapping.
-        - The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
-
-        OPERATIONAL CONSTRAINTS:
-        - NO NEW ELEMENTS: Strictly forbidden.
-        - NO DELETION: Strictly forbidden. Every layer must be accounted for.
-        - NO CROPPING: Strictly forbidden.
-        - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
+        DESIGNER AUDIT STEPS:
+        - Link visual observations to Metadata IDs [layer-ID].
+        - Cite Brand Rules from [GLOBAL PROJECT KNOWLEDGE] to justify recomposition choices.
+        - Identify the "Visual Anchor" and ensure it is not obscured by secondary metadata.
 
         JSON OUTPUT RULES:
-        - Leading reasoning must justify 'overrides' by citing specific brand constraints or visual patterns.
-        - 'knowledgeApplied' must be set to true if Knowledge rules were used to calculate offsets/scale.
-        - Your 'overrides' must accurately map to the 'layerId' strings provided in the hierarchy.
+        - Your 'reasoning' must explicitly confirm: "Inventory Verified: All source layers preserved."
+        - Use 'overrides' for all semantic adjustments (xOffset, yOffset, individualScale).
+        - 'method' must be 'GEOMETRIC'.
     `;
     
     if (knowledgeContext && knowledgeContext.rules) {
