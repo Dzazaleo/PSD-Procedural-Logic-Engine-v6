@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "Reasoning-First Semantic Recomposition". You must critique the composition before calculating coordinates.
+        GOAL: Perform "ID-Grounded Semantic Recomposition". 
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -640,22 +640,25 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
-        DESIGN DIRECTIVES (Strict Enforcement):
-        1. REASONING-FIRST AUDIT: Your 'reasoning' field must contain a professional design critique. Identify issues such as visual crowding, lack of hierarchy, or poor optical centering. 
-        2. OPTICAL VS GEOMETRIC: Do not just center bounding boxes. Analyze the "Visual Mass" (e.g., the belly of a potion bottle) and align text/elements to that mass.
-        3. NEGATIVE SPACE: Prioritize legibility. If elements are "bleeding" into each other (e.g., text labels overlapping), reduce scale and increase padding to create distinct scanning rhythms.
-        4. HIERARCHY PRESERVATION: Key focal points must remain dominant. Secondary metadata should be tucked into negative space without obscuring primary assets.
+        GROUNDING PROTOCOL (MANDATORY):
+        1. Every visual observation must be linked to a Metadata ID. When critiquing an element, refer to it by its visual description AND its ID in brackets. (e.g., "The yellow '1300' text [layer-0.1.3]...").
+        2. VISION VS METADATA: Use the provided Image for aesthetic audit and the JSON Layer Hierarchy for identification and final coordinate calculation.
+        3. SPATIAL ANCHORING: The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
+        
+        DESIGNER AUDIT STEPS:
+        - Identify the "Visual Anchor" (the primary asset the user cares about).
+        - Audit for "Layer Collisions" (where text or secondary assets obscure the Anchor).
+        - Propose "Optical Adjustments" to offsets and scale to restore balance.
 
         OPERATIONAL CONSTRAINTS:
-        - NO NEW ELEMENTS: You cannot add effects, shadows, text, or assets.
-        - NO DELETION/CROPPING: Every layer provided in the JSON must be present in the output. Do not "remove" layers to save space.
-        - METHOD 'GEOMETRIC': For this phase, use purely geometric transforms. 'generativePrompt' MUST be an empty string "".
+        - NO NEW ELEMENTS: Do not add assets or effects.
+        - NO DELETION: Every layer in the JSON must remain visible and accounted for.
+        - NO CROPPING: Use scale and position only.
+        - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 
-        PIVOT PROTOCOL:
-        If the user requests to "reset", "stop generating", or if the layout is crowded:
-        1. Set 'method' to 'GEOMETRIC'.
-        2. Set 'generativePrompt' to "".
-        3. Use the 'overrides' array to satisfy readability (adjusting xOffset, yOffset, and individualScale).
+        JSON OUTPUT RULES:
+        - Your 'reasoning' must lead with the ID-grounded audit.
+        - Your 'overrides' must accurately map to the 'layerId' strings provided in the hierarchy.
     `;
     
     if (knowledgeContext && knowledgeContext.rules) {
