@@ -631,7 +631,7 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
 
     let prompt = `
         ROLE: Senior Visual Systems Lead & Expert Graphic Designer.
-        GOAL: Perform "ID-Grounded Semantic Recomposition". 
+        GOAL: Perform "Knowledge-Anchored Semantic Recomposition".
         
         CONTAINER CONTEXT:
         - Source: ${sourceData.container.containerName} (${sourceW}x${sourceH})
@@ -640,24 +640,25 @@ export const DesignAnalystNode = memo(({ id, data }: NodeProps<PSDNodeData>) => 
         LAYER HIERARCHY (JSON):
         ${JSON.stringify(layerAnalysisData.slice(0, 40))}
 
-        GROUNDING PROTOCOL (MANDATORY):
-        1. Every visual observation must be linked to a Metadata ID. When critiquing an element, refer to it by its visual description AND its ID in brackets. (e.g., "The yellow '1300' text [layer-0.1.3]...").
-        2. VISION VS METADATA: Use the provided Image for aesthetic audit and the JSON Layer Hierarchy for identification and final coordinate calculation.
-        3. SPATIAL ANCHORING: The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
+        KNOWLEDGE INTEGRATION PROTOCOL (MANDATORY):
+        1. KNOWLEDGE AS TRUTH: The provided [GLOBAL PROJECT KNOWLEDGE] rules are Hard Constraints. They override your personal aesthetic preferences if a conflict exists.
+        2. RULE CITATION: Your 'reasoning' must explicitly cite which Brand Rule or Visual Anchor pattern you are following. (e.g., "Per Brand Rule #1..." or "Matching the spacing rhythm of Visual Anchor #2...").
+        3. VISUAL ANCHOR ANALYSIS: Study the attached Visual Reference images for Spatial Rhythm. If the references show airy layouts, maximize white space. If they show dense layouts, tighten the composition.
         
-        DESIGNER AUDIT STEPS:
-        - Identify the "Visual Anchor" (the primary asset the user cares about).
-        - Audit for "Layer Collisions" (where text or secondary assets obscure the Anchor).
-        - Propose "Optical Adjustments" to offsets and scale to restore balance.
+        GROUNDING PROTOCOL:
+        - Link every visual observation to a Metadata ID [layer-ID].
+        - Use the Image for visual auditing and JSON for coordinate mapping.
+        - The top-left corner (0,0) of your visual workspace is the top-left of the Target Container (${targetData.name}).
 
         OPERATIONAL CONSTRAINTS:
-        - NO NEW ELEMENTS: Do not add assets or effects.
-        - NO DELETION: Every layer in the JSON must remain visible and accounted for.
-        - NO CROPPING: Use scale and position only.
+        - NO NEW ELEMENTS: Strictly forbidden.
+        - NO DELETION: Strictly forbidden. Every layer must be accounted for.
+        - NO CROPPING: Strictly forbidden.
         - METHOD 'GEOMETRIC': 'generativePrompt' MUST be "".
 
         JSON OUTPUT RULES:
-        - Your 'reasoning' must lead with the ID-grounded audit.
+        - Leading reasoning must justify 'overrides' by citing specific brand constraints or visual patterns.
+        - 'knowledgeApplied' must be set to true if Knowledge rules were used to calculate offsets/scale.
         - Your 'overrides' must accurately map to the 'layerId' strings provided in the hierarchy.
     `;
     
